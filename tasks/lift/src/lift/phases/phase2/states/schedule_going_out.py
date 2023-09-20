@@ -19,6 +19,12 @@ class ScheduleGoingOut(smach.State):
         smach.State.__init__(self, outcomes=['success', 'failed'])
         self.default = default
 
+        self.head_motions = {
+            'look_straight': self.default.controllers.head_controller.look_straight,
+            'look_right': self.default.controllers.head_controller.look_right,
+            'look_left': self.default.controllers.head_controller.look_left
+        }
+
     def listen(self):
         resp = self.default.speech()
         if not resp.success:
@@ -63,11 +69,24 @@ class ScheduleGoingOut(smach.State):
 
 
 
+    # def is_anyone_in_front_of_me(self):
+    #     pcl_msg = rospy.wait_for_message("/xtion/depth_registered/points", PointCloud2)
+    #     polygon = rospy.get_param('/corners_arena')
+    #     detections, im = perform_detection(self.default, pcl_msg, polygon, ['person'])
+    #     return len(detections) > 0
     def is_anyone_in_front_of_me(self):
-        pcl_msg = rospy.wait_for_message("/xtion/depth_registered/points", PointCloud2)
-        polygon = rospy.get_param('/corners_arena')
-        detections, im = perform_detection(self.default, pcl_msg, polygon, ['person'])
-        return len(detections) > 0
+        detections = 0
+        for motion in self.head_motions:
+            self.head_motions[motion]()
+            pcl_msg = rospy.wait_for_message("/xtion/depth_registered/points", PointCloud2)
+            polygon = rospy.get_param('/corners_arena')
+            detections, im = perform_detection(self.default, pcl_msg, polygon, ['person'])
+            if len(detections) > 0:
+                self.default.controllers.head_controller.look_straight()
+                return True
+        return False
+
+
 
 
     def execute(self, userdata):
@@ -78,7 +97,7 @@ class ScheduleGoingOut(smach.State):
         # is_robot_closest_rank = rank(points_name="/lift/pos_persons") or self.is_anyone_in_front_of_me()
         print("is robot closest rank->>> {}".format(is_robot_closest_rank))
 
-        is_closer_to_door = is_robot_closest_rank
+        is_closer_to_door = not self.is_anyone_in_front_of_me()
         if is_closer_to_door:
             self.default.voice.speak("I am the closest to the door so I have to exit first")
             # clear costmap
@@ -93,19 +112,6 @@ class ScheduleGoingOut(smach.State):
             # wait for the person to exit
             rospy.sleep(2)
             self.default.voice.speak("Should I wait more for you?")
-            # hear
-            # hear_wait = True
-            # count = 0
-            # while hear_wait and count < 5:
-            #     if RASA:
-            #         hear_wait = self.hear_wait()
-            #         if hear_wait:
-            #             self.default.voice.speak("I will wait more")
-            #             rospy.sleep(5)
-            #         else:
-            #             self.default.voice.speak("i am done with waiting")
-            #             break
-            #         count += 1
 
             # untested
             hear_wait = "yes"

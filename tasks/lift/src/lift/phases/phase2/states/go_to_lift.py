@@ -93,6 +93,8 @@ class GoToLift(smach.State):
             print(type(keypoint))
 
 
+        self.default.voice.speak("Let me talk to the audience.")
+        # self.default.voice.speak("Let me talk to the audience. Breaking the fourth wall.")
         # transform to the global frame
         global_points = w.local_to_global_points(M=M, points=keypoint, is_lift=True)
         p = Pose()
@@ -100,8 +102,8 @@ class GoToLift(smach.State):
         p.position.y = global_points[0][1]
 
         # TODO: maybe don't hardcode this, take the orientation from the door
-        p.position.z = -0.5923
-        p.orientation.w = 0.8056
+        p.position.z = 0.999978960672
+        p.orientation.w = 0.0064867722379
 
         state = self.default.controllers.base_controller.sync_to_pose(p)
 
