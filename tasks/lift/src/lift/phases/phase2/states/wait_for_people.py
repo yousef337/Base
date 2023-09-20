@@ -149,16 +149,17 @@ class WaitForPeople(smach.State):
         if count_people < count:
             return 'failed'
         else:
-            self.default.voice.speak("Are you ready for me to enter the lift?")
-            self.default.voice.speak("Please answer with a yes or no")
-            answer = 'no'
-            if RASA:
-                answer = self.affirm()
-                print("Answer from Speech: ", answer)
-                if answer == 'yes':
-                    self.default.voice.speak("Good stuff!")
-                    return 'success'
-                else:
-                    return 'failed'
+           # self.default.voice.speak("Are you ready for me to enter the lift?")
+            #self.default.voice.speak("Please answer with a yes or no")
+            #answer = 'no'
+            #if RASA:
+             #   answer = self.affirm()
+              #  print("Answer from Speech: ", answer)
+               # if answer == 'yes':
+                #    self.default.voice.speak("Good stuff!")
+                 #   return 'success'
+                #else:
+                 #   return 'failed'
+            return 'success'
 
 
