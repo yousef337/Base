@@ -1,0 +1,4 @@
+sensor_msgs/Image img
+---
+int32 x
+int32 y
