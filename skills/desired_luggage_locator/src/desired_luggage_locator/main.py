@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 import rospy
 import mediapipe as mp
 import cv2
 import numpy as np
 from math import acos, pi
 from desired_luggage_locator.srv import LocateTargetedLuggageCords, LocateTargetedLuggageCordsResponse
-from settings import POSE_LANDMARK_MODEL
+from desired_luggage_locator.settings import POSE_LANDMARK_MODEL
 from cv_bridge3 import CvBridge
 
 def toNPArray(landmark):
@@ -50,28 +51,38 @@ def main(req):
     PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
     VisionRunningMode = mp.tasks.vision.RunningMode
 
+    # Put ourselves in the model folder
+    import os
+    import rospkg
+    rp = rospkg.RosPack()
+    package_path = rp.get_path('desired_luggage_locator')
+    os.chdir(os.path.abspath(os.path.join(package_path, 'models')))
+
     options = PoseLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=POSE_LANDMARK_MODEL),
         running_mode=VisionRunningMode.IMAGE)
 
 
+    mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_cv2)
+
     with PoseLandmarker.create_from_options(options) as landmarker:
-        pose_landmarker_result = landmarker.detect(img_cv2)
-        
-        rightHand = scoreMajorHand(pose_landmarker_result, 23, 11, 13, 15)
-        leftHand = scoreMajorHand(pose_landmarker_result, 24, 12, 14, 16)
+        pose_landmarker_result = landmarker.detect(mp_img)
 
-        majorHand = detectMajor(rightHand, leftHand)
+        if len(pose_landmarker_result.pose_landmarks) > 0:
+            rightHand = scoreMajorHand(pose_landmarker_result, 23, 11, 13, 15)
+            leftHand = scoreMajorHand(pose_landmarker_result, 24, 12, 14, 16)
 
-        if majorHand != None:
-            res.x = int(majorHand[2][0] * len(img_cv2))
-            res.y = int(majorHand[2][1] * len(img_cv2[1]))
-            return res
+            majorHand = detectMajor(rightHand, leftHand)
+
+            if majorHand != None:
+                res.x = int(majorHand[2][0] * len(img_cv2))
+                res.y = int(majorHand[2][1] * len(img_cv2[1]))
+                return res
     
     return res
 
 
 
 rospy.init_node("desired_luggage_locator")
-rospy.Service("desiredLuggageLocator", LocateTargetedLuggageCords)
+rospy.Service("desiredLuggageLocator", LocateTargetedLuggageCords, main)
 rospy.spin()

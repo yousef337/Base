@@ -1,1 +1,1 @@
-POSE_LANDMARK_MODEL = "models/pose_landmarker_full.task"
+POSE_LANDMARK_MODEL = "pose_landmarker_full.task"

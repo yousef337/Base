@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   catkin_virtualenv
+  sensor_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -75,7 +76,7 @@ add_service_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
-  geometry_msgs   std_msgs
+  geometry_msgs   std_msgs sensor_msgs
 )
 
 ################################################
