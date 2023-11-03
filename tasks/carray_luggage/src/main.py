@@ -12,7 +12,6 @@ def main():
     rospy.init_node("carrayLuggage")
     context = Context()
 
-    #TODO: REPLACE ANGLES WITH ELBOW-WRIST BAGS ANGLES
     # LocateDesiredLuggage(context)
     # GoToLuggage(context)
     # PickUpLuggage(context)
