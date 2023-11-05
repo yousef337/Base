@@ -1,4 +1,5 @@
 sensor_msgs/Image img
+int32[] points
 ---
-int32 x
-int32 y
+int32[] cords
+float32[] vis
