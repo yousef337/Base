@@ -3,7 +3,7 @@ from lasr_vision_msgs.srv import YoloDetection
 from cv_bridge3 import CvBridge
 # from lasr_shapely import LasrShapely
 from tf_module.srv import TfTransform
-from tiago_controllers.controllers import BaseController
+from tiago_controllers.controllers import BaseController, HeadController
 
 class Context:
     def __init__(self):
@@ -16,6 +16,7 @@ class Context:
         self.tf = rospy.ServiceProxy('tf_transform', TfTransform)
         rospy.loginfo("TF Alive")
         self.baseController = BaseController()
+        self.headController = HeadController()
 
         self.initialPose = self.baseController.get_current_pose()
 

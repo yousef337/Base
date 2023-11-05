@@ -13,28 +13,40 @@ def get_person_location(context):
     detections = list(filter(lambda x: x.name in ['person'], context.yolo(image_msg, "yolov8n-seg.pt", 0.7, 0.2).detected_objects))
 
     # TODO: Account for visibility, increase it when no there, move 90 degrees until 360 before fail
+    # IF NO DETECTION, MOVE 90 DEGREES TIMES BEFORE EXITING, Add a time out
+    # IF VIS too low, move head up down left right to ensure better visibility
 
     if detections and detections[0]:
 
-        getShoulderPose = LocateTargetedLuggageCordsRequest()
-        getShoulderPose.img = image_msg
-        getShoulderPose.points = [11, 12]
+        pixels = []
 
-        res = rospy.ServiceProxy('desiredLuggageLocator', LocateTargetedLuggageCords)(getShoulderPose)
-        pixels = np.array(res.cords).reshape(-1, 2)
+        while len(pixels) == 0:
+            print("STUCK IN LOW VISIBILITY")
+            getShoulderPose = LocateTargetedLuggageCordsRequest()
+            getShoulderPose.img = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
+            getShoulderPose.points = [11, 12]
 
-        return estimate_xyz_from_single_point(context, pcl_msg, int((pixels[0][0]+pixels[1][0])/2), int((pixels[0][1]+pixels[1][0])/2))
+            res = rospy.ServiceProxy('desiredLuggageLocator', LocateTargetedLuggageCords)(getShoulderPose)
+            pixels = np.array(res.cords).reshape(-1, 2)
+            vis = res.vis
+
+
+        print("===========================res")
+        print(pixels)
+        print(vis)
+
+        return estimate_xyz_from_single_point(context, pcl_msg, pixels[0][0], pixels[0][1])
     
     return None
 
-def uv_group(uv, padding=2):
+def uv_group(uv, padding=1):
     lst = [uv]
     for i in range(-padding, padding):
         for j in range(-padding, padding):
             lst.append((uv[0] + i, uv[0] + j))
     return lst
 
-def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=2):
+def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=1):
     xyz = read_points_list(pcl_msg, field_names=["x", "y", "z"], skip_nans=True, uvs=uv_group((x, y), padding))
     xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
     avg_xyz = np.average(xyz, axis=0)
@@ -56,29 +68,34 @@ def to_map_frame(context, pcl_msg, pose):
 
 def main(context):
     last_person_pose = get_person_location(context)
-    print("TAKEN")
     rospy.sleep(1)
     current_person_pose = get_person_location(context)
 
-    print("====================NORM")
-    print(np.linalg.norm(current_person_pose - last_person_pose))
+    stand_still = 0
 
-    while current_person_pose.all() != None and np.linalg.norm(current_person_pose - last_person_pose) > 0.5:
-        last_person_pose = current_person_pose
-        initialP = context.baseController.get_current_pose()
-        #TODO: fix orientation to whereever orientation is human -> a function in controllers
-        #TODO: fix exiting condition to be run over 10 times
-        p = Pose()
-        p.position.x = current_person_pose[0] #- (1.5 * -1 if initialP[0] > current_person_pose[0] else 1)
-        p.position.y = current_person_pose[1] #- (1.5 * -1 if initialP[1] > current_person_pose[1] else 1)
-        p.position.z = 0
-        p.orientation.x = initialP[2].x
-        p.orientation.y = initialP[2].y
-        p.orientation.z = initialP[2].z
-        p.orientation.w = initialP[2].w
-        context.baseController.sync_to_pose(p)
+    while stand_still < 10:
         
+        if current_person_pose.all() != None and np.linalg.norm(current_person_pose - last_person_pose) > 0.5:
+
+            last_person_pose = current_person_pose
+            initialP = context.baseController.get_current_pose()
+            p = Pose()
+            p.position.x = current_person_pose[0] - (1 * -1 if initialP[0] > current_person_pose[0] else 1)
+            p.position.y = current_person_pose[1] - (1 * -1 if initialP[1] > current_person_pose[1] else 1)
+            p.position.z = 0
+            p.orientation.x = initialP[2].x
+            p.orientation.y = initialP[2].y
+            p.orientation.z = initialP[2].z
+            p.orientation.w = initialP[2].w
+            context.baseController.sync_to_pose(p)
+            context.baseController.sync_face_to(current_person_pose[0], current_person_pose[1])
+            stand_still = 0
+        else:
+            stand_still += 1
+            rospy.sleep(0.7)
+
         rospy.sleep(0.5)
         current_person_pose = get_person_location(context)
-        print("====================NORM")
-        print(np.linalg.norm(current_person_pose - last_person_pose))
+        if current_person_pose.all() != None:
+            print("====================NORM")
+            print(np.linalg.norm(current_person_pose - last_person_pose))

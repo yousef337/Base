@@ -12,12 +12,12 @@ def main():
     rospy.init_node("carrayLuggage")
     context = Context()
 
-    # LocateDesiredLuggage(context)
-    # GoToLuggage(context)
-    # PickUpLuggage(context)
+    LocateDesiredLuggage(context)
+    GoToLuggage(context)
+    PickUpLuggage(context)
     FollowPerson(context)
-    # ReleaseLuggage(context)
-    # ReturnToInitialPose(context)
+    ReleaseLuggage(context)
+    ReturnToInitialPose(context)
 
 
 main()
