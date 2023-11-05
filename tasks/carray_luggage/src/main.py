@@ -8,8 +8,9 @@ from phases.release_luggage.main import main as ReleaseLuggage
 from phases.follow_person.main import main as FollowPerson
 from context import Context
 
+
 def main():
-    rospy.init_node("carrayLuggage")
+    rospy.init_node('carrayLuggage')
     context = Context()
 
     LocateDesiredLuggage(context)
