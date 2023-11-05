@@ -4,6 +4,7 @@ from cv_bridge3 import CvBridge
 # from lasr_shapely import LasrShapely
 from tf_module.srv import TfTransform
 from tiago_controllers.controllers import BaseController, HeadController
+from lasr_voice.voice import Voice
 
 class Context:
     def __init__(self):
@@ -19,5 +20,6 @@ class Context:
         self.headController = HeadController()
 
         self.initialPose = self.baseController.get_current_pose()
+        self.voice = Voice()
 
         self.luggagePose = None
