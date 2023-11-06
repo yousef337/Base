@@ -5,9 +5,9 @@ from tf_module.srv import TfTransformRequest
 from std_msgs.msg import String
 from geometry_msgs.msg import PointStamped, Point, Pose
 from sensor_msgs.point_cloud2 import read_points_list
-from desired_luggage_locator.srv import (
-    LocateTargetedLuggageCords,
-    LocateTargetedLuggageCordsRequest,
+from locate_body_pose.srv import (
+    LocateBodyPose,
+    LocateBodyPoseRequest,
 )
 
 
@@ -35,14 +35,14 @@ def get_person_location(context):
 
         while len(pixels) == 0:
             print('STUCK IN LOW VISIBILITY')
-            getShoulderPose = LocateTargetedLuggageCordsRequest()
+            getShoulderPose = LocateBodyPoseRequest()
             getShoulderPose.img = rospy.wait_for_message(
                 '/xtion/rgb/image_raw', Image
             )
             getShoulderPose.points = [11, 12]
 
             res = rospy.ServiceProxy(
-                'desiredLuggageLocator', LocateTargetedLuggageCords
+                'desiredLuggageLocator', LocateBodyPose
             )(getShoulderPose)
             pixels = np.array(res.cords).reshape(-1, 2)
             vis = res.vis

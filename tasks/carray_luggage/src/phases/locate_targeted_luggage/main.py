@@ -4,9 +4,9 @@ import cv2
 import numpy as np
 from sensor_msgs.msg import PointCloud2, Image
 from sensor_msgs.point_cloud2 import read_points_list
-from desired_luggage_locator.srv import (
-    LocateTargetedLuggageCords,
-    LocateTargetedLuggageCordsRequest,
+from locate_body_pose.srv import (
+    LocateBodyPose,
+    LocateBodyPoseRequest,
 )
 from math import acos
 from tf_module.srv import TfTransformRequest
@@ -128,11 +128,11 @@ def estimate_xyz_from_points(context, pcl_msg, points):
 def get_hand_vectors(context, detection):
 
     context.baseController.sync_face_to(detection[3][0], detection[3][1])
-    getHandCords = LocateTargetedLuggageCordsRequest()
+    getHandCords = LocateBodyPoseRequest()
     getHandCords.img = detection[2]
     getHandCords.points = [13, 15, 14, 16]
     res = rospy.ServiceProxy(
-        'desiredLuggageLocator', LocateTargetedLuggageCords
+        'locateBodyPose', LocateBodyPose
     )(getHandCords)
     print('res')
     print(res)

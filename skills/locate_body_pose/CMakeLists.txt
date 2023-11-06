@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(desired_luggage_locator)
+project(locate_body_pose)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -63,7 +63,7 @@ catkin_generate_virtualenv(
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  LocateTargetedLuggageCords.srv
+  LocateBodyPose.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -166,7 +166,7 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  src/desired_luggage_locator/main.py
+  src/locate_body_pose/main.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

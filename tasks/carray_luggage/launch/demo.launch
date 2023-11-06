@@ -1,6 +1,5 @@
 <launch>
     <node pkg="tf_module" name="tf_transforms_base" type="tf_transforms_base.py" required="true"/>
     <node pkg="lasr_vision_yolov8" type="service" name="service" output="screen"/>
-    <!-- <node pkg="desired_luggage_locator" type="main.py" name="main"/> -->
-
+    <node pkg="locate_body_pose" type="main.py" name="main"/>
 </launch>

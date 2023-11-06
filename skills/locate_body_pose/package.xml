@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>desired_luggage_locator</name>
+  <name>locate_body_pose</name>
   <version>0.0.0</version>
-  <description>The desired_luggage_locator package</description>
+  <description>The locate_body_pose package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->

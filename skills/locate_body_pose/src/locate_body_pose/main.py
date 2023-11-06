@@ -3,7 +3,7 @@ import rospy
 import mediapipe as mp
 import cv2
 import numpy as np
-from desired_luggage_locator.srv import LocateTargetedLuggageCords, LocateTargetedLuggageCordsResponse
+from locate_body_pose.srv import LocateBodyPose, LocateBodyPoseResponse
 from settings import POSE_LANDMARK_MODEL
 from cv_bridge3 import CvBridge
 
@@ -34,7 +34,7 @@ def getPixel(pose_landmarker_result, img_cv2, idx):
     return int(pose_landmarker_result.pose_landmarks[0][idx].x * len(img_cv2[1])), int(pose_landmarker_result.pose_landmarks[0][idx].y * len(img_cv2))
 
 def main(req):
-    res = LocateTargetedLuggageCordsResponse()
+    res = LocateBodyPoseResponse()
     bridge = CvBridge()
     img_cv2 = bridge.imgmsg_to_cv2_np(req.img)
 
@@ -47,7 +47,7 @@ def main(req):
     import os
     import rospkg
     rp = rospkg.RosPack()
-    package_path = rp.get_path('desired_luggage_locator')
+    package_path = rp.get_path('locate_body_pose')
     os.chdir(os.path.abspath(os.path.join(package_path, 'models')))
 
     options = PoseLandmarkerOptions(
@@ -88,6 +88,6 @@ def main(req):
 
 
 
-rospy.init_node("desired_luggage_locator")
-rospy.Service("desiredLuggageLocator", LocateTargetedLuggageCords, main)
+rospy.init_node("locate_body_pose")
+rospy.Service("locateBodyPose", LocateBodyPose, main)
 rospy.spin()
