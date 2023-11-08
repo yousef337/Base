@@ -32,7 +32,14 @@ def in_result(results, entry):
     )
 
 
-def analyze_area(context):
+def analyze_area(context, rightHandPoses, leftHandPoses):
+    lookingDir = 0
+
+    if rightHandPoses[1] or leftHandPoses[1]:
+        lookingDir = 2
+    elif rightHandPoses[2] or leftHandPoses[2]:
+        lookingDir = 1
+
     results = []
     looks = [
         context.headController.look_straight_down,
@@ -40,7 +47,7 @@ def analyze_area(context):
         context.headController.look_right_down,
     ]
 
-    for i in looks:
+    for i in [looks[0], looks[lookingDir]]:
         i()
         rospy.sleep(1)
         img_msg = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
@@ -155,7 +162,7 @@ def get_hand_vectors(context):
     vis = res.vis
 
     c = 0
-    while len(pixels) < 1 and sum(vis) < 2 and c < 10:
+    while (len(pixels) < 1 or sum(vis) < 2) and c < 10:
         rospy.sleep(1)
         img_msg = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
         pcl_msg = rospy.wait_for_message(
@@ -185,11 +192,25 @@ def get_hand_vectors(context):
         context, pcl_msg, pixels[3][0], pixels[3][1]
     )
 
+    rightHandDown = True if (pixels[0][0] - pixels[1][0]) < 10 else False
+    rightHandLeft = True if (pixels[0][0] - pixels[1][0]) > 10 else False
+    rightHandRight = not (rightHandDown or rightHandLeft)
+
+    rightPoses = (rightHandDown, rightHandLeft, rightHandRight)
+
+    leftHandDown = True if (pixels[2][0] - pixels[3][0]) < 10 else False
+    leftHandLeft = True if (pixels[2][0] - pixels[3][0]) > 10 else False
+    leftHandRight = not (leftHandDown or leftHandLeft)
+
+    leftPoses = (leftHandDown, leftHandLeft, leftHandRight)
+
     return (
         -(rightWrist - rightElbow),
         -(leftWrist - leftElbow),
         rightWrist,
         leftWrist,
+        rightPoses,
+        leftPoses
     )
 
 
@@ -234,10 +255,9 @@ def get_pointed_pose(detections, rightVec, leftVec, rightWrist, leftWrist):
 
 
 def main(context):
-    context.headController.look_straight()
     rospy.sleep(1)
-    detections = analyze_area(context)
-    rightVec, leftVec, rightWrist, leftWrist = get_hand_vectors(context)
+    rightVec, leftVec, rightWrist, leftWrist, rightHandPoses, leftHandPoses = get_hand_vectors(context)
+    detections = analyze_area(context, rightHandPoses, leftHandPoses)
     context.luggagePose = get_pointed_pose(
         detections, rightVec, leftVec, rightWrist, leftWrist
     )[3]
