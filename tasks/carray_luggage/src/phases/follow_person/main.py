@@ -42,7 +42,7 @@ def get_person_location(context):
             getShoulderPose.points = [11, 12]
 
             res = rospy.ServiceProxy(
-                'desiredLuggageLocator', LocateBodyPose
+                'locateBodyPose', LocateBodyPose
             )(getShoulderPose)
             pixels = np.array(res.cords).reshape(-1, 2)
             vis = res.vis

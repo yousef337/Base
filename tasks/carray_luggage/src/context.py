@@ -25,3 +25,5 @@ class Context:
         self.voice = Voice()
 
         self.luggagePose = None
+        
+        rospy.set_param("/is_simulation", False)

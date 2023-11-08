@@ -35,20 +35,21 @@ def in_result(results, entry):
 def analyze_area(context):
     results = []
     looks = [
-        context.headController.look_straight,
-        context.headController.look_left,
-        context.headController.look_right,
+        context.headController.look_straight_down,
+        context.headController.look_left_down,
+        context.headController.look_right_down,
     ]
 
     for i in looks:
         i()
+        rospy.sleep(1)
         img_msg = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
         pcl_msg = rospy.wait_for_message(
             '/xtion/depth_registered/points', PointCloud2
         )
         detections = list(
             filter(
-                lambda x: x.name in ['suitcase', 'person'],
+                lambda x: x.name in ['suitcase'],
                 context.yolo(
                     img_msg, 'yolov8n-seg.pt', 0.7, 0.2
                 ).detected_objects,
@@ -104,56 +105,89 @@ def uv_group(uv, padding=1):
     return lst
 
 
-def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=1):
-    xyz = read_points_list(
-        pcl_msg,
-        field_names=['x', 'y', 'z'],
-        skip_nans=True,
-        uvs=uv_group((x, y), padding),
+def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=1, c=0):
+    try:
+        xyz = read_points_list(
+            pcl_msg,
+            field_names=['x', 'y', 'z'],
+            skip_nans=True,
+            uvs=uv_group((x, y), padding),
+        )
+        xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
+        avg_xyz = np.average(xyz, axis=0)
+        return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
+    except:
+        if c < 10:
+            rospy.sleep(1)
+            return estimate_xyz_from_single_point(context, x, y, padding, c+1)
+        else:
+            raise MemoryError()
+
+def estimate_xyz_from_points(context, pcl_msg, points, c=0):
+    try:
+        xyz = read_points_list(
+            pcl_msg, field_names=['x', 'y', 'z'], skip_nans=True, uvs=points
+        )
+        xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
+        avg_xyz = np.average(xyz, axis=0)
+        return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
+    except:
+        if c < 10:
+            rospy.sleep(1)
+            return estimate_xyz_from_points(context, pcl_msg, points, c+1)
+        else:
+            raise MemoryError()
+
+def get_hand_vectors(context):
+    context.headController.look_straight()
+    img_msg = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
+    pcl_msg = rospy.wait_for_message(
+        '/xtion/depth_registered/points', PointCloud2
     )
-    xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
-    avg_xyz = np.average(xyz, axis=0)
-    return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
-
-
-def estimate_xyz_from_points(context, pcl_msg, points):
-    xyz = read_points_list(
-        pcl_msg, field_names=['x', 'y', 'z'], skip_nans=True, uvs=points
-    )
-    xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
-    avg_xyz = np.average(xyz, axis=0)
-    return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
-
-
-def get_hand_vectors(context, detection):
-
-    context.baseController.sync_face_to(detection[3][0], detection[3][1])
+    
     getHandCords = LocateBodyPoseRequest()
-    getHandCords.img = detection[2]
+    getHandCords.img = img_msg
     getHandCords.points = [13, 15, 14, 16]
     res = rospy.ServiceProxy(
         'locateBodyPose', LocateBodyPose
     )(getHandCords)
+    pixels = np.array(res.cords).reshape(-1, 2)
+    vis = res.vis
+
+    c = 0
+    while len(pixels) < 1 and sum(vis) < 2 and c < 10:
+        rospy.sleep(1)
+        img_msg = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
+        pcl_msg = rospy.wait_for_message(
+            '/xtion/depth_registered/points', PointCloud2
+        )
+
+        getHandCords.img = img_msg
+        res = rospy.ServiceProxy(
+            'locateBodyPose', LocateBodyPose
+        )(getHandCords)
+        pixels = np.array(res.cords).reshape(-1, 2)
+        vis = res.vis
+
     print('res')
     print(res)
-    pixels = np.array(res.cords).reshape(-1, 2)
 
     rightElbow = estimate_xyz_from_single_point(
-        context, detection[1], pixels[0][0], pixels[0][1]
+        context, pcl_msg, pixels[0][0], pixels[0][1]
     )
     rightWrist = estimate_xyz_from_single_point(
-        context, detection[1], pixels[1][0], pixels[1][1]
+        context, pcl_msg, pixels[1][0], pixels[1][1]
     )
     leftElbow = estimate_xyz_from_single_point(
-        context, detection[1], pixels[2][0], pixels[2][1]
+        context, pcl_msg, pixels[2][0], pixels[2][1]
     )
     leftWrist = estimate_xyz_from_single_point(
-        context, detection[1], pixels[3][0], pixels[3][1]
+        context, pcl_msg, pixels[3][0], pixels[3][1]
     )
 
     return (
-        (rightWrist - rightElbow),
-        (leftWrist - leftElbow),
+        -(rightWrist - rightElbow),
+        -(leftWrist - leftElbow),
         rightWrist,
         leftWrist,
     )
@@ -200,11 +234,10 @@ def get_pointed_pose(detections, rightVec, leftVec, rightWrist, leftWrist):
 
 
 def main(context):
+    context.headController.look_straight()
+    rospy.sleep(1)
     detections = analyze_area(context)
-    rightVec, leftVec, rightWrist, leftWrist = get_hand_vectors(
-        context,
-        detections[(list(map(lambda d: d[0], detections))).index('person')],
-    )
+    rightVec, leftVec, rightWrist, leftWrist = get_hand_vectors(context)
     context.luggagePose = get_pointed_pose(
         detections, rightVec, leftVec, rightWrist, leftWrist
     )[3]

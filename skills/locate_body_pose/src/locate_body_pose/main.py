@@ -4,7 +4,7 @@ import mediapipe as mp
 import cv2
 import numpy as np
 from locate_body_pose.srv import LocateBodyPose, LocateBodyPoseResponse
-from settings import POSE_LANDMARK_MODEL
+from locate_body_pose.settings import POSE_LANDMARK_MODEL
 from cv_bridge3 import CvBridge
 
 def draw_landmarks_on_image(rgb_image, detection_result):

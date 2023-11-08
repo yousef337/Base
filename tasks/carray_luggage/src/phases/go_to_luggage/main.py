@@ -16,7 +16,7 @@ def main(context):
     )
     p.position.z = 0
     p.orientation.w = 1
-    context.baseController.sync_to_pose(p)
     context.baseController.sync_face_to(
         context.luggagePose[0], context.luggagePose[1]
     )
+    context.baseController.sync_to_pose(p)
