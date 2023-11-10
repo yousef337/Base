@@ -21,4 +21,3 @@ def main(context):
     # )
     context.baseController.sync_to_pose(p)
     context.headController.look_straight()
-

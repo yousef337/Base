@@ -127,14 +127,19 @@ def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=2, c=0):
         )
         xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
         avg_xyz = np.average(xyz, axis=0)
-        return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
+        return to_map_frame(
+            context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]]
+        )
     except:
         if c < 10:
             rospy.sleep(1)
             print(c)
-            return estimate_xyz_from_single_point(context, pcl_msg, x, y, padding, c+1)
+            return estimate_xyz_from_single_point(
+                context, pcl_msg, x, y, padding, c + 1
+            )
         else:
             raise MemoryError()
+
 
 def estimate_xyz_from_points(context, pcl_msg, points, c=0):
     try:
@@ -143,13 +148,16 @@ def estimate_xyz_from_points(context, pcl_msg, points, c=0):
         )
         xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
         avg_xyz = np.average(xyz, axis=0)
-        return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
+        return to_map_frame(
+            context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]]
+        )
     except:
         if c < 10:
             rospy.sleep(1)
-            return estimate_xyz_from_points(context, pcl_msg, points, c+1)
+            return estimate_xyz_from_points(context, pcl_msg, points, c + 1)
         else:
             raise MemoryError()
+
 
 def get_hand_vectors(context):
     context.headController.look_straight()
@@ -157,13 +165,11 @@ def get_hand_vectors(context):
     pcl_msg = rospy.wait_for_message(
         '/xtion/depth_registered/points', PointCloud2
     )
-    
+
     getHandCords = LocateBodyPoseRequest()
     getHandCords.img = img_msg
     getHandCords.points = [13, 15, 14, 16]
-    res = rospy.ServiceProxy(
-        'locateBodyPose', LocateBodyPose
-    )(getHandCords)
+    res = rospy.ServiceProxy('locateBodyPose', LocateBodyPose)(getHandCords)
     pixels = np.array(res.cords).reshape(-1, 2)
     vis = res.vis
 
@@ -176,9 +182,9 @@ def get_hand_vectors(context):
         )
 
         getHandCords.img = img_msg
-        res = rospy.ServiceProxy(
-            'locateBodyPose', LocateBodyPose
-        )(getHandCords)
+        res = rospy.ServiceProxy('locateBodyPose', LocateBodyPose)(
+            getHandCords
+        )
         pixels = np.array(res.cords).reshape(-1, 2)
         vis = res.vis
         print(pixels)
@@ -211,7 +217,7 @@ def get_hand_vectors(context):
         rightWrist,
         leftWrist,
         rightPoses,
-        leftPoses
+        leftPoses,
     )
 
 
@@ -257,8 +263,15 @@ def get_pointed_pose(detections, rightVec, leftVec, rightWrist, leftWrist):
 
 def main(context):
     rospy.sleep(1)
-    rightVec, leftVec, rightWrist, leftWrist, rightHandPoses, leftHandPoses = get_hand_vectors(context)
-    print("==================")
+    (
+        rightVec,
+        leftVec,
+        rightWrist,
+        leftWrist,
+        rightHandPoses,
+        leftHandPoses,
+    ) = get_hand_vectors(context)
+    print('==================')
     print(rightHandPoses)
     print(leftHandPoses)
     detections = analyze_area(context, rightHandPoses, leftHandPoses)

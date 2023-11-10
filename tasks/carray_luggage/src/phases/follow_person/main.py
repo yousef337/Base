@@ -41,9 +41,9 @@ def get_person_location(context):
             )
             getShoulderPose.points = [11, 12]
 
-            res = rospy.ServiceProxy(
-                'locateBodyPose', LocateBodyPose
-            )(getShoulderPose)
+            res = rospy.ServiceProxy('locateBodyPose', LocateBodyPose)(
+                getShoulderPose
+            )
             pixels = np.array(res.cords).reshape(-1, 2)
             vis = res.vis
 
@@ -76,14 +76,19 @@ def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=2, c=0):
         )
         xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
         avg_xyz = np.average(xyz, axis=0)
-        return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
+        return to_map_frame(
+            context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]]
+        )
     except:
         if c < 10:
             rospy.sleep(1)
             print(c)
-            return estimate_xyz_from_single_point(context, pcl_msg, x, y, padding, c+1)
+            return estimate_xyz_from_single_point(
+                context, pcl_msg, x, y, padding, c + 1
+            )
         else:
             raise MemoryError()
+
 
 def to_map_frame(context, pcl_msg, pose):
     centroid_xyz = pose
@@ -140,6 +145,10 @@ def main(context):
 
         rospy.sleep(0.5)
         current_person_pose = get_person_location(context)
-        if len(current_person_pose) > 0 and len(last_person_pose) > 0 and current_person_pose.all() != None:
+        if (
+            len(current_person_pose) > 0
+            and len(last_person_pose) > 0
+            and current_person_pose.all() != None
+        ):
             print('====================NORM')
             print(np.linalg.norm(current_person_pose - last_person_pose))
