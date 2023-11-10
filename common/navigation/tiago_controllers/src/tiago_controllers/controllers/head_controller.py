@@ -82,7 +82,7 @@ class HeadController:
     def look_left(self):
         self.sync_reach_to(1, 0.0)
 
-    def look_straight(self):
+    def look_straight_down(self):
         self.sync_reach_to(0.0, -0.5)
 
     def look_right_down(self):

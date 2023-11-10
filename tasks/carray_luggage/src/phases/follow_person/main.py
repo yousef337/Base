@@ -55,7 +55,7 @@ def get_person_location(context):
             context, pcl_msg, pixels[0][0], pixels[0][1]
         )
 
-    return None
+    return []
 
 
 def uv_group(uv, padding=1):
@@ -66,18 +66,24 @@ def uv_group(uv, padding=1):
     return lst
 
 
-def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=1):
-    xyz = read_points_list(
-        pcl_msg,
-        field_names=['x', 'y', 'z'],
-        skip_nans=True,
-        uvs=uv_group((x, y), padding),
-    )
-    xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
-    avg_xyz = np.average(xyz, axis=0)
-
-    return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
-
+def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=2, c=0):
+    try:
+        xyz = read_points_list(
+            pcl_msg,
+            field_names=['x', 'y', 'z'],
+            skip_nans=True,
+            uvs=uv_group((x, y), padding),
+        )
+        xyz = list(map(lambda x: [x.x, x.y, x.z], xyz))
+        avg_xyz = np.average(xyz, axis=0)
+        return to_map_frame(context, pcl_msg, [avg_xyz[0], avg_xyz[1], avg_xyz[2]])
+    except:
+        if c < 10:
+            rospy.sleep(1)
+            print(c)
+            return estimate_xyz_from_single_point(context, pcl_msg, x, y, padding, c+1)
+        else:
+            raise MemoryError()
 
 def to_map_frame(context, pcl_msg, pose):
     centroid_xyz = pose
@@ -108,20 +114,17 @@ def main(context):
     while stand_still < 10:
 
         if (
-            current_person_pose.all() != None
-            and np.linalg.norm(current_person_pose - last_person_pose) > 0.5
+            len(last_person_pose) > 0
+            and len(current_person_pose) > 0
+            and current_person_pose.all() != None
+            and np.linalg.norm(current_person_pose - last_person_pose) > 0.2
         ):
 
             last_person_pose = current_person_pose
             initialP = context.baseController.get_current_pose()
             p = Pose()
-            p.position.x = current_person_pose[0] - (
-                1 * -1 if initialP[0] > current_person_pose[0] else 1
-            )
-            p.position.y = current_person_pose[1] - (
-                1 * -1 if initialP[1] > current_person_pose[1] else 1
-            )
-            p.position.z = 0
+            p.position.x = current_person_pose[0]
+            p.position.y = current_person_pose[1]
             p.orientation.x = initialP[2].x
             p.orientation.y = initialP[2].y
             p.orientation.z = initialP[2].z
@@ -137,6 +140,6 @@ def main(context):
 
         rospy.sleep(0.5)
         current_person_pose = get_person_location(context)
-        if current_person_pose.all() != None:
+        if len(current_person_pose) > 0 and len(last_person_pose) > 0 and current_person_pose.all() != None:
             print('====================NORM')
             print(np.linalg.norm(current_person_pose - last_person_pose))

@@ -34,11 +34,16 @@ def in_result(results, entry):
 
 def analyze_area(context, rightHandPoses, leftHandPoses):
     lookingDir = 0
+    majorRight = abs(rightHandPoses) > abs(leftHandPoses)
 
-    if rightHandPoses[1] or leftHandPoses[1]:
+    if majorRight and rightHandPoses < 0:
         lookingDir = 2
-    elif rightHandPoses[2] or leftHandPoses[2]:
+    elif majorRight and rightHandPoses > 0:
         lookingDir = 1
+    elif not majorRight and leftHandPoses > 0:
+        lookingDir = 1
+    elif not majorRight and leftHandPoses < 0:
+        lookingDir = 2
 
     results = []
     looks = [
@@ -112,7 +117,7 @@ def uv_group(uv, padding=1):
     return lst
 
 
-def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=1, c=0):
+def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=2, c=0):
     try:
         xyz = read_points_list(
             pcl_msg,
@@ -126,7 +131,8 @@ def estimate_xyz_from_single_point(context, pcl_msg, x, y, padding=1, c=0):
     except:
         if c < 10:
             rospy.sleep(1)
-            return estimate_xyz_from_single_point(context, x, y, padding, c+1)
+            print(c)
+            return estimate_xyz_from_single_point(context, pcl_msg, x, y, padding, c+1)
         else:
             raise MemoryError()
 
@@ -175,6 +181,9 @@ def get_hand_vectors(context):
         )(getHandCords)
         pixels = np.array(res.cords).reshape(-1, 2)
         vis = res.vis
+        print(pixels)
+        print(vis)
+        c += 1
 
     print('res')
     print(res)
@@ -192,17 +201,9 @@ def get_hand_vectors(context):
         context, pcl_msg, pixels[3][0], pixels[3][1]
     )
 
-    rightHandDown = True if (pixels[0][0] - pixels[1][0]) < 10 else False
-    rightHandLeft = True if (pixels[0][0] - pixels[1][0]) > 10 else False
-    rightHandRight = not (rightHandDown or rightHandLeft)
+    rightPoses = pixels[0][0] - pixels[1][0]
 
-    rightPoses = (rightHandDown, rightHandLeft, rightHandRight)
-
-    leftHandDown = True if (pixels[2][0] - pixels[3][0]) < 10 else False
-    leftHandLeft = True if (pixels[2][0] - pixels[3][0]) > 10 else False
-    leftHandRight = not (leftHandDown or leftHandLeft)
-
-    leftPoses = (leftHandDown, leftHandLeft, leftHandRight)
+    leftPoses = pixels[2][0] - pixels[3][0]
 
     return (
         -(rightWrist - rightElbow),
@@ -257,6 +258,9 @@ def get_pointed_pose(detections, rightVec, leftVec, rightWrist, leftWrist):
 def main(context):
     rospy.sleep(1)
     rightVec, leftVec, rightWrist, leftWrist, rightHandPoses, leftHandPoses = get_hand_vectors(context)
+    print("==================")
+    print(rightHandPoses)
+    print(leftHandPoses)
     detections = analyze_area(context, rightHandPoses, leftHandPoses)
     context.luggagePose = get_pointed_pose(
         detections, rightVec, leftVec, rightWrist, leftWrist
