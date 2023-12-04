@@ -23,6 +23,7 @@ add_service_files(
   SegmentBB.srv
   Centroid.srv
   MaskFromCuboid.srv
+  SegmentView.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

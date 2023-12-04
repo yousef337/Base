@@ -12,7 +12,9 @@ from math import acos
 from tf_module.srv import TfTransformRequest
 from std_msgs.msg import String
 from geometry_msgs.msg import PointStamped, Point
-
+import point_cloud_utils as pcu
+from sensor_msgs.point_cloud2 import read_points_list
+from pcl_segmentation.srv import SegmentView, SegmentViewRequest
 
 def in_result(results, entry):
     return (
@@ -31,6 +33,15 @@ def in_result(results, entry):
         < 0.1
     )
 
+def ros_to_list(pcl_msg):
+    return read_points_list(
+                pcl_msg,
+                field_names=['x', 'y', 'z'],
+                skip_nans=True)
+
+def load_cloud():
+    import open3d as o3d
+    return np.asarray(o3d.io.read_point_cloud('file.pcd').points)
 
 def analyze_area(context, rightHandPoses, leftHandPoses):
     lookingDir = 0
@@ -55,38 +66,48 @@ def analyze_area(context, rightHandPoses, leftHandPoses):
     for i in [looks[0], looks[lookingDir]]:
         i()
         rospy.sleep(1)
-        img_msg = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
-        pcl_msg = rospy.wait_for_message(
-            '/xtion/depth_registered/points', PointCloud2
-        )
-        detections = list(
-            filter(
-                lambda x: x.name in ['suitcase'],
-                context.yolo(
-                    img_msg, 'yolov8n-seg.pt', 0.7, 0.2
-                ).detected_objects,
-            )
-        )
-        mappedDetections = list(
-            map(
-                lambda d: (
-                    d.name,
-                    estimate_xyz_from_points(
-                        context,
-                        pcl_msg,
-                        contour(
-                            context, img_msg, np.array(d.xyseg).reshape(-1, 2)
-                        ).tolist(),
-                    ),
-                ),
-                detections,
-            )
-        )
+        rospy.wait_for_service('/pcl_segmentation_server/segment_view')
+        clusters = rospy.ServiceProxy('/pcl_segmentation_server/segment_view', SegmentView)(True).clusters
+        print("RECEIVED")
+        minIdx = (-1, -1)
 
-        for entry in mappedDetections:
-            if not in_result(results, entry):
-                results.append((entry[0], pcl_msg, img_msg, entry[1]))
+        b = load_cloud()
+        bNormalized = list(map(lambda p: [p.x,   p.y,   p.z], b))
 
+        for j in range(len(clusters)):
+            a = ros_to_list(clusters[j])[:]
+
+            maxXA = (max(a, key=lambda x: x.x)).x
+            minXA = (min(a, key=lambda x: x.x)).x
+
+            maxYA = (max(a, key=lambda x: x.y)).y
+            minYA = (min(a, key=lambda x: x.y)).y
+
+            maxZA = (max(a, key=lambda x: x.z)).z
+            minZA = (min(a, key=lambda x: x.z)).z
+
+
+            maxXB = (max(b, key=lambda x: x.x)).x
+            minXB = (min(b, key=lambda x: x.x)).x
+
+            maxYB = (max(b, key=lambda x: x.y)).y
+            minYB = (min(b, key=lambda x: x.y)).y
+
+            maxZB = (max(b, key=lambda x: x.z)).z
+            minZB = (min(b, key=lambda x: x.z)).z
+
+            aNormalized = list(map(lambda p: [(p.x+minXB-minXA),   (p.y+minYB-minYA),   (p.z+minZB-minZA)], a))
+
+            hausdorff_dist, _, _ = pcu.one_sided_hausdorff_distance(np.array(aNormalized), np.array(bNormalized))
+            hausdorff_distb, _, _ = pcu.one_sided_hausdorff_distance(np.array(bNormalized), np.array(aNormalized))
+            print(hausdorff_dist, hausdorff_distb)
+            print(abs(hausdorff_dist - hausdorff_distb))
+
+            if minIdx[1] < 0 or minIdx[1] > abs(hausdorff_dist - hausdorff_distb):
+                minIdx = (j, abs(hausdorff_dist - hausdorff_distb), a, aNormalized)
+            print("----")
+
+    results.append(to_map_frame(context, clusters[minIdx[0]], minIdx[2]))
     return results
 
 
@@ -238,21 +259,20 @@ def contour(context, img_msg, pts):
 
 
 def calculate_angles(detections, rightVec, leftVec, rightWrist, leftWrist):
-    bags = list(filter(lambda x: x[0] == 'suitcase', detections))
     bagsAngles = []
 
-    for bag in bags:
+    for bag in detections:
         bagsAngles.append(
-            get_angle_between((np.array(bag[3]) - rightWrist), rightVec)
+            get_angle_between((np.array(bag) - rightWrist), rightVec)
         )
         bagsAngles.append(
-            get_angle_between((np.array(bag[3]) - leftWrist), leftVec)
+            get_angle_between((np.array(bag) - leftWrist), leftVec)
         )
 
     print('ANGLES')
     print(bagsAngles)
 
-    return bags[int(bagsAngles.index(min(bagsAngles)) / 2)]
+    return detections[int(bagsAngles.index(min(bagsAngles)) / 2)]
 
 
 def get_pointed_pose(detections, rightVec, leftVec, rightWrist, leftWrist):
@@ -271,10 +291,10 @@ def main(context):
         rightHandPoses,
         leftHandPoses,
     ) = get_hand_vectors(context)
-    print('==================')
-    print(rightHandPoses)
-    print(leftHandPoses)
+
     detections = analyze_area(context, rightHandPoses, leftHandPoses)
+
+
     context.luggagePose = get_pointed_pose(
         detections, rightVec, leftVec, rightWrist, leftWrist
     )[3]

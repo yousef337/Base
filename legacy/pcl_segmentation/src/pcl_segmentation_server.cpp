@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <pcl/point_types.h>
+#include <pcl/filters/voxel_grid.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
@@ -18,6 +19,16 @@
 #include "mask_from_cuboid.h"
 #include "centroid.h"
 #include "segment_bb.h"
+#include <pcl/search/kdtree.h>
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/visualization/cloud_viewer.h>
+#include <pcl/common/io.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/filters/extract_indices.h>
 
 tf2_ros::Buffer * transformBuffer;
 tf2_ros::TransformListener * transformListener;
@@ -36,7 +47,129 @@ int main(int argc, char** argv)
 	ros::ServiceServer segment_bb_service = n.advertiseService("/pcl_segmentation_server/segment_bb", handle_segment_bb);
 	ros::ServiceServer mask_from_cuboid_service = n.advertiseService("/pcl_segmentation_server/mask_from_cuboid", handle_mask_from_cuboid);
 	ros::ServiceServer centroid_service = n.advertiseService("/pcl_segmentation_server/centroid", handle_centroid);
+	ros::ServiceServer segment_view_service = n.advertiseService("/pcl_segmentation_server/segment_view", handle_segment_objects);
 	ros::spin();
+}
+
+void publish_pc(pcl::PointCloud<pcl::PointXYZRGB> *cloud, std::string frame) {
+	// sensor_msgs::PointCloud2 output;
+  	// pcl::PCLPointCloud2 outputPCL;
+
+    // pcl::toPCLPointCloud2(*cloud ,outputPCL);
+	// pcl_conversions::fromPCL(outputPCL, output);
+
+	// output.header.frame_id = frame;
+	
+	// int i = 0;
+	// while (i < 2) {
+	// 	pub.publish(output);
+	// 	ros::Duration(1.5).sleep();
+	// 	i++;
+	// }
+	
+}
+
+bool handle_segment_objects(pcl_segmentation::SegmentView::Request& req, pcl_segmentation::SegmentView::Response& res) {
+	const sensor_msgs::PointCloud2 pc = *(ros::topic::waitForMessage<sensor_msgs::PointCloud2>("/xtion/depth_registered/points"));
+	
+  	pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
+  	pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
+
+	pcl_conversions::toPCL(pc, *cloud);
+
+	// Perform voxel grid downsampling filtering
+  	pcl::PCLPointCloud2* downSampledCloud = new pcl::PCLPointCloud2;
+  	pcl::PCLPointCloud2ConstPtr downSampledCloudPtr(downSampledCloud);
+	
+	pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+	sor.setInputCloud(cloudPtr);
+	sor.setLeafSize(0.01, 0.01, 0.01);
+	sor.filter(*downSampledCloud);
+
+
+
+
+	pcl::PointCloud<pcl::PointXYZRGB> *xyz_cloud = new pcl::PointCloud<pcl::PointXYZRGB>;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr xyzCloudPtr (xyz_cloud); // need a boost shared pointer for pcl function inputs
+
+	// convert the pcl::PointCloud2 tpye to pcl::PointCloud<pcl::PointXYZRGB>
+	pcl::fromPCLPointCloud2(*downSampledCloudPtr, *xyzCloudPtr);
+
+
+	// create a pcl object to hold the ransac filtered results
+	pcl::PointCloud<pcl::PointXYZRGB> *xyz_cloud_ransac_filtered = new pcl::PointCloud<pcl::PointXYZRGB>;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr xyzCloudPtrRansacFiltered (xyz_cloud_ransac_filtered);
+
+
+	// perform ransac planar filtration to remove table top
+	pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+	pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+	// Create the segmentation object
+	pcl::SACSegmentation<pcl::PointXYZRGB> seg1;
+	seg1.setOptimizeCoefficients (true);
+	seg1.setModelType (pcl::SACMODEL_PLANE);
+	seg1.setMethodType (pcl::SAC_RANSAC);
+	seg1.setDistanceThreshold (0.04);
+
+	seg1.setInputCloud (xyzCloudPtr);
+	seg1.segment (*inliers, *coefficients);
+
+
+	// Create the filtering object
+	pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+
+	//extract.setInputCloud (xyzCloudPtrFiltered);
+	extract.setInputCloud (xyzCloudPtr);
+	extract.setIndices (inliers);
+	extract.setNegative (true);
+	extract.filter (*xyzCloudPtrRansacFiltered);
+
+
+
+
+
+	// Create the KdTree object for the search method of the extraction
+	pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
+	tree->setInputCloud (xyzCloudPtrRansacFiltered);
+
+	// create the extraction object for the clusters
+	std::vector<pcl::PointIndices> cluster_indices;
+	pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
+	ec.setClusterTolerance(0.02); // 2cm
+	ec.setMinClusterSize(600);
+	ec.setMaxClusterSize(25000);
+	ec.setSearchMethod(tree);
+	ec.setInputCloud(xyzCloudPtrRansacFiltered);
+	ec.extract(cluster_indices);
+
+	sensor_msgs::PointCloud2 output;
+  	pcl::PCLPointCloud2 outputPCL;
+
+	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it) {
+
+		// create a pcl object to hold the extracted cluster
+		pcl::PointCloud<pcl::PointXYZRGB> *cluster = new pcl::PointCloud<pcl::PointXYZRGB>;
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr clusterPtr (cluster);
+
+		
+		// now we are in a vector of indices pertaining to a single cluster.
+		// Assign each point corresponding to this cluster in xyzCloudPtrPassthroughFiltered a specific color for identification purposes
+		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
+			clusterPtr->points.push_back(xyzCloudPtrRansacFiltered->points[*pit]);
+		
+
+		// if (req.publish)
+		// 	publish_pc(*clusterPtr, pc.header.frame_id)
+		
+		pcl::toPCLPointCloud2(*cluster ,outputPCL);
+		pcl_conversions::fromPCL(outputPCL, output);
+
+		output.header.frame_id = pc.header.frame_id;
+	
+		res.clusters.push_back(output);
+  	}
+
+	return true;
 }
 
 bool handle_segment_cuboid(pcl_segmentation::SegmentCuboid::Request& req, pcl_segmentation::SegmentCuboid::Response &res)
