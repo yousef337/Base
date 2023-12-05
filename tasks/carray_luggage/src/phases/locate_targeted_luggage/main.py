@@ -46,6 +46,7 @@ def load_cloud():
 def analyze_area(context, rightHandPoses, leftHandPoses):
     lookingDir = 0
     majorRight = abs(rightHandPoses) > abs(leftHandPoses)
+    hausdroffLimit = 0.01
 
     if majorRight and rightHandPoses < 0:
         lookingDir = 2
@@ -103,7 +104,7 @@ def analyze_area(context, rightHandPoses, leftHandPoses):
             print(hausdorff_dist, hausdorff_distb)
             print(abs(hausdorff_dist - hausdorff_distb))
 
-            if minIdx[1] < 0 or minIdx[1] > abs(hausdorff_dist - hausdorff_distb):
+            if (minIdx[1] < 0 or minIdx[1] > abs(hausdorff_dist - hausdorff_distb)) and hausdorff_dist - hausdorff_distb < hausdroffLimit:
                 minIdx = (j, abs(hausdorff_dist - hausdorff_distb), a, aNormalized)
             print("----")
 
