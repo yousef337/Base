@@ -125,7 +125,22 @@ bool handle_segment_objects(pcl_segmentation::SegmentView::Request& req, pcl_seg
 	extract.filter (*xyzCloudPtrRansacFiltered);
 
 
+	ros::NodeHandle n;
+	ros::Publisher pub = n.advertise<sensor_msgs::PointCloud2>("PP", 5);
+	sensor_msgs::PointCloud2 outputJ;
+  	pcl::PCLPointCloud2 outputPCLJ;
 
+    pcl::toPCLPointCloud2(*xyzCloudPtrRansacFiltered ,outputPCLJ);
+	pcl_conversions::fromPCL(outputPCLJ, outputJ);
+
+	outputJ.header.frame_id = pc.header.frame_id;
+	
+	int i = 0;
+	while (i < 5) {
+		pub.publish(outputJ);
+		ros::Duration(1.5).sleep();
+		i++;
+	}
 
 
 	// Create the KdTree object for the search method of the extraction
@@ -135,7 +150,7 @@ bool handle_segment_objects(pcl_segmentation::SegmentView::Request& req, pcl_seg
 	// create the extraction object for the clusters
 	std::vector<pcl::PointIndices> cluster_indices;
 	pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
-	ec.setClusterTolerance(0.02); // 2cm
+	ec.setClusterTolerance(0.04); // 2cm
 	ec.setMinClusterSize(600);
 	ec.setMaxClusterSize(25000);
 	ec.setSearchMethod(tree);

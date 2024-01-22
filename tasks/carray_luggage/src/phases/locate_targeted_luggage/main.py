@@ -44,6 +44,8 @@ def load_cloud():
     return np.asarray(o3d.io.read_point_cloud('file.pcd').points)
 
 def analyze_area(context, rightHandPoses, leftHandPoses):
+    pub = rospy.Publisher("/pc", PointCloud2, queue_size=10)
+
     lookingDir = 0
     majorRight = abs(rightHandPoses) > abs(leftHandPoses)
     hausdroffLimit = 0.01
@@ -70,13 +72,32 @@ def analyze_area(context, rightHandPoses, leftHandPoses):
         rospy.wait_for_service('/pcl_segmentation_server/segment_view')
         clusters = rospy.ServiceProxy('/pcl_segmentation_server/segment_view', SegmentView)(True).clusters
         print("RECEIVED")
-        minIdx = (-1, -1)
+        minIdx = (-1, -1, [])
 
         b = load_cloud()
-        bNormalized = list(map(lambda p: [p.x,   p.y,   p.z], b))
-
+        print("ssssssssssssssssssss")
+        print(len(clusters))
         for j in range(len(clusters)):
+
+            # for _ in range(3):
+            #     pub.publish(clusters[j])
+            #     rospy.sleep(1)
+
+
+
             a = ros_to_list(clusters[j])[:]
+            aList = list(map(lambda x: [x.x, x.y, x.z], a))
+            # asw = str(input("DDT")) 
+            # if asw == "0":
+            #     import open3d as o3d
+            #     temp = o3d.geometry.PointCloud()
+            #     temp.points = o3d.utility.Vector3dVector(a)
+            #     print("Saved")
+            #     o3d.io.write_point_cloud("bag.pcd", temp)
+            # else:
+            #     print(asw)
+                
+
 
             maxXA = (max(a, key=lambda x: x.x)).x
             minXA = (min(a, key=lambda x: x.x)).x
@@ -88,27 +109,27 @@ def analyze_area(context, rightHandPoses, leftHandPoses):
             minZA = (min(a, key=lambda x: x.z)).z
 
 
-            maxXB = (max(b, key=lambda x: x.x)).x
-            minXB = (min(b, key=lambda x: x.x)).x
+            # maxXB = (max(b, key=lambda x: x.x)).x
+            minXB = (min(b, key=lambda x: x[0]))[0]
 
-            maxYB = (max(b, key=lambda x: x.y)).y
-            minYB = (min(b, key=lambda x: x.y)).y
+            # maxYB = (max(b, key=lambda x: x.y)).y
+            minYB = (min(b, key=lambda x: x[1]))[1]
 
-            maxZB = (max(b, key=lambda x: x.z)).z
-            minZB = (min(b, key=lambda x: x.z)).z
+            # maxZB = (max(b, key=lambda x: x.z)).z
+            minZB = (min(b, key=lambda x: x[2]))[2]
 
             aNormalized = list(map(lambda p: [(p.x+minXB-minXA),   (p.y+minYB-minYA),   (p.z+minZB-minZA)], a))
 
-            hausdorff_dist, _, _ = pcu.one_sided_hausdorff_distance(np.array(aNormalized), np.array(bNormalized))
-            hausdorff_distb, _, _ = pcu.one_sided_hausdorff_distance(np.array(bNormalized), np.array(aNormalized))
+            hausdorff_dist, _, _ = pcu.one_sided_hausdorff_distance(np.array(aNormalized), np.array(b))
+            hausdorff_distb, _, _ = pcu.one_sided_hausdorff_distance(np.array(b), np.array(aNormalized))
             print(hausdorff_dist, hausdorff_distb)
             print(abs(hausdorff_dist - hausdorff_distb))
 
-            if (minIdx[1] < 0 or minIdx[1] > abs(hausdorff_dist - hausdorff_distb)) and hausdorff_dist - hausdorff_distb < hausdroffLimit:
-                minIdx = (j, abs(hausdorff_dist - hausdorff_distb), a, aNormalized)
+            if (minIdx[0] < 0 or minIdx[1] > abs(hausdorff_dist - hausdorff_distb)) and hausdorff_dist - hausdorff_distb < hausdroffLimit:
+                minIdx = (j, abs(hausdorff_dist - hausdorff_distb), aList)
             print("----")
 
-    results.append(to_map_frame(context, clusters[minIdx[0]], minIdx[2]))
+    results.append(to_map_frame(context, clusters[minIdx[0]], np.average(minIdx[2], axis=0)))
     return results
 
 
@@ -298,4 +319,4 @@ def main(context):
 
     context.luggagePose = get_pointed_pose(
         detections, rightVec, leftVec, rightWrist, leftWrist
-    )[3]
+    )
