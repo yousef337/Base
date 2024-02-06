@@ -17,6 +17,7 @@ def get_person_location(context):
     ]
 
     for i in looks:
+        rospy.sleep(1)
         i()
 
         img_msg = rospy.wait_for_message('/xtion/rgb/image_raw', Image)
@@ -104,7 +105,7 @@ def main(context):
 
         if (
             len(last_person_pose) > 0
-            and np.linalg.norm(np.array([robot_pose[0], robot_pose[1]]) - last_person_pose) > 1.5
+            and np.linalg.norm(np.array([robot_pose[0], robot_pose[1]]) - last_person_pose) > 2
         ):
 
             print('====================NORM')
@@ -120,10 +121,10 @@ def main(context):
             p.orientation.w = robot_pose[2].w
 
             if abs(last_person_pose[0] - robot_pose[0]) > 2:
-                p.position.x -= 1 if last_person_pose[0] > robot_pose[0] else -1
+                p.position.x -= 1.5 if last_person_pose[0] > robot_pose[0] else -1.5
             
             if abs(last_person_pose[1] - robot_pose[1]) > 2:
-                p.position.y -= 1 if last_person_pose[1] > robot_pose[1] else -1
+                p.position.y -= 1.5 if last_person_pose[1] > robot_pose[1] else -1.5
             
             context.baseController.sync_to_pose(p)
             context.baseController.sync_to_pose(p)
@@ -131,9 +132,8 @@ def main(context):
             stand_still = 0
         else:
             stand_still += 1
-            rospy.sleep(0.7)
 
-        rospy.sleep(0.5)
+        rospy.sleep(0.7)
         last_person_pose = get_person_location(context)[:2]
         robot_pose = context.baseController.get_current_pose()
         if (len(last_person_pose) > 0):
