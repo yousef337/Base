@@ -4,7 +4,8 @@ import mediapipe as mp
 import cv2
 import numpy as np
 from locate_body_pose.srv import LocateBodyPose, LocateBodyPoseResponse
-from locate_body_pose.settings import POSE_LANDMARK_MODEL
+from locate_body_pose.msg import BodyPoseInfo
+from settings import POSE_LANDMARK_MODEL
 from cv_bridge3 import CvBridge
 
 def draw_landmarks_on_image(rgb_image, detection_result):
@@ -30,8 +31,8 @@ def draw_landmarks_on_image(rgb_image, detection_result):
       solutions.drawing_styles.get_default_pose_landmarks_style())
   return annotated_image
 
-def getPixel(pose_landmarker_result, img_cv2, idx):
-    return int(pose_landmarker_result.pose_landmarks[0][idx].x * len(img_cv2[1])), int(pose_landmarker_result.pose_landmarks[0][idx].y * len(img_cv2))
+def getPixel(pose_landmarker_result, img_cv2, idx, detectionIdx):
+    return int(pose_landmarker_result.pose_landmarks[detectionIdx][idx].x * len(img_cv2[1])), int(pose_landmarker_result.pose_landmarks[detectionIdx][idx].y * len(img_cv2))
 
 def main(req):
     res = LocateBodyPoseResponse()
@@ -66,20 +67,24 @@ def main(req):
             annotated_image = draw_landmarks_on_image(mp_img.numpy_view(), pose_landmarker_result)
             cv2.imwrite("b.png", cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
             
-            # locs = [13, 15, 14, 16, 11, 12]
+
             locs = req.points
-            pts = []
-            vis = []
+            for detectionIdx in range(len(pose_landmarker_result.pose_landmarks)):
+              pts = []
+              vis = []
 
-            for i in locs:
-                x, y = getPixel(pose_landmarker_result, img_cv2, i)
-                pts.append(x)
-                pts.append(y)
-                vis.append(pose_landmarker_result.pose_landmarks[0][i].visibility)
+              for i in locs:
+                  x, y = getPixel(pose_landmarker_result, img_cv2, i, detectionIdx)
+                  pts.append(x)
+                  pts.append(y)
+                  vis.append(pose_landmarker_result.pose_landmarks[0][i].visibility)
 
 
-            res.cords = pts
-            res.vis = vis
+              poseMsg = BodyPoseInfo()
+              poseMsg.cords = pts
+              poseMsg.vis = vis
+
+              res.pose.append(poseMsg)
             return res
 
 

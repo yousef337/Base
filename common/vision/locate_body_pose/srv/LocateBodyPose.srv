@@ -1,5 +1,4 @@
 sensor_msgs/Image img
 int32[] points
 ---
-int32[] cords
-float32[] vis
+BodyPoseInfo[] pose
